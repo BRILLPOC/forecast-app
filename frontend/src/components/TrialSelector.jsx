@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
 
-function TrialSelector({ onSelectTrial }) {
+function TrialSelector({ programSeq, onSelectTrial, onBack }) {
   const [trials, setTrials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -9,14 +9,22 @@ function TrialSelector({ onSelectTrial }) {
 
   useEffect(() => {
     fetchTrials();
-  }, []);
+  }, [programSeq]);
 
   const fetchTrials = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await api.getTrials();
-      setTrials(data);
+      
+      if (programSeq) {
+        // Fetch trials for the selected program
+        const data = await api.getTrialsByProgram(programSeq);
+        setTrials(data);
+      } else {
+        // Fall back to all trials if no program is selected
+        const data = await api.getTrials();
+        setTrials(data);
+      }
     } catch (err) {
       setError(err.message);
       console.error('Failed to fetch trials:', err);
@@ -26,20 +34,39 @@ function TrialSelector({ onSelectTrial }) {
   };
 
   const filteredTrials = trials.filter(
-    (trial) =>
-      trial.TRIAL_ID.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      trial.TRIAL_SEQ.toString().includes(searchTerm)
+    (trial) => {
+      const trialId = trial.TRIAL_ID || trial.trial_id || '';
+      const trialName = trial.TRIAL_NAME || trial.trial_name || '';
+      const trialSeq = trial.TRIAL_SEQ || trial.trial_seq;
+      const searchLower = searchTerm.toLowerCase();
+      
+      return (
+        trialId.toLowerCase().includes(searchLower) ||
+        trialName.toLowerCase().includes(searchLower) ||
+        trialSeq?.toString().includes(searchTerm)
+      );
+    }
   );
 
   return (
     <div className="card elevated">
       <div className="card-header">
-        <h2>Select a Trial</h2>
-        <p>Choose a clinical trial to analyze demand forecasting</p>
+        <div className="header-with-back">
+          {onBack && (
+            <button className="back-button" onClick={onBack} title="Back to programs">
+              ← Back
+            </button>
+          )}
+          <div>
+            <h2>Select a Trial</h2>
+            <p>Choose a clinical trial to analyze demand forecasting</p>
+          </div>
+        </div>
       </div>
 
       {error && (
         <div className="alert alert-danger">
+          <span>⚠️</span>
           <span>{error}</span>
         </div>
       )}
@@ -56,7 +83,7 @@ function TrialSelector({ onSelectTrial }) {
             <input
               id="search"
               type="text"
-              placeholder="Search by trial ID or sequence number..."
+              placeholder="Search by trial ID, name, or sequence number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -64,31 +91,66 @@ function TrialSelector({ onSelectTrial }) {
 
           {filteredTrials.length === 0 ? (
             <div className="alert alert-info">
+              <span>ℹ️</span>
               <span>
                 {trials.length === 0
-                  ? 'No trials available'
+                  ? 'No trials available for this program'
                   : 'No trials match your search'}
               </span>
             </div>
           ) : (
             <div className="grid cols-2">
-              {filteredTrials.map((trial) => (
-                <button
-                  key={trial.TRIAL_SEQ}
-                  className="trial-card"
-                  onClick={() => onSelectTrial(trial)}
-                >
-                  <div className="trial-id">{trial.TRIAL_ID}</div>
-                  <div className="trial-seq">Sequence: {trial.TRIAL_SEQ}</div>
-                  <div className="trial-action">Select →</div>
-                </button>
-              ))}
+              {filteredTrials.map((trial) => {
+                const trialId = trial.TRIAL_ID || trial.trial_id;
+                const trialSeq = trial.TRIAL_SEQ || trial.trial_seq;
+                const trialName = trial.TRIAL_NAME || trial.trial_name;
+                const description = trial.DESCRIPTION || trial.description;
+                
+                return (
+                  <button
+                    key={trialSeq}
+                    className="trial-card"
+                    onClick={() => onSelectTrial(trial)}
+                  >
+                    <div className="trial-id">{trialId}</div>
+                    {trialName && <div className="trial-name">{trialName}</div>}
+                    {description && <div className="trial-description">{description}</div>}
+                    <div className="trial-seq">Seq: {trialSeq}</div>
+                    <div className="trial-action">Select →</div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
       <style>{`
+        .header-with-back {
+          display: flex;
+          align-items: flex-start;
+          gap: 1rem;
+        }
+
+        .back-button {
+          background: var(--gray-light);
+          border: 1px solid var(--border-color);
+          border-radius: 4px;
+          padding: 0.5rem 1rem;
+          cursor: pointer;
+          font-weight: 600;
+          color: var(--text-primary);
+          transition: all 0.2s;
+          min-width: fit-content;
+          margin-top: 0.25rem;
+        }
+
+        .back-button:hover {
+          background: var(--primary-light);
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
         .trial-card {
           background: white;
           border: 2px solid var(--border-color);
@@ -111,6 +173,23 @@ function TrialSelector({ onSelectTrial }) {
           font-weight: 600;
           color: var(--primary);
           margin-bottom: 0.5rem;
+        }
+
+        .trial-name {
+          font-size: 0.95rem;
+          color: var(--text-primary);
+          margin-bottom: 0.5rem;
+          font-weight: 500;
+        }
+
+        .trial-description {
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          margin-bottom: 0.75rem;
+          line-height: 1.4;
+          max-height: 3em;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .trial-seq {

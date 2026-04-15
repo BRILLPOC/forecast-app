@@ -263,4 +263,40 @@ export const compareScenario = async (baselineRequest, scenarioRequest) => {
   }
 };
 
+// ===== VERSION ENDPOINTS =====
+
+/**
+ * Get all available enrollment versions for a trial
+ * @param {number} trialSeq - Trial sequence number
+ * @returns {Promise<Object>} Object with versions array and latest_version
+ */
+export const getEnrollmentVersions = async (trialSeq) => {
+  try {
+    console.log(`[API:Versions] Fetching enrollment versions for trial_seq=${trialSeq}...`);
+    const response = await apiClient.get(`/trials/${trialSeq}/enrollment-versions`);
+    console.log(`[API:Versions] Enrollment versions retrieved:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`[API:Versions] Error fetching enrollment versions:`, error.message);
+    throw new Error(`Failed to get enrollment versions: ${error.message}`);
+  }
+};
+
+/**
+ * Get all available dosing versions for a trial
+ * @param {number} trialSeq - Trial sequence number
+ * @returns {Promise<Object>} Object with versions array and latest_version
+ */
+export const getDosingVersions = async (trialSeq) => {
+  try {
+    console.log(`[API:Versions] Fetching dosing versions for trial_seq=${trialSeq}...`);
+    const response = await apiClient.get(`/trials/${trialSeq}/dosing-versions`);
+    console.log(`[API:Versions] Dosing versions retrieved:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`[API:Versions] Error fetching dosing versions:`, error.message);
+    throw new Error(`Failed to get dosing versions: ${error.message}`);
+  }
+};
+
 export default apiClient;

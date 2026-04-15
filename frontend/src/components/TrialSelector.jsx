@@ -52,11 +52,7 @@ function TrialSelector({ programSeq, onSelectTrial, onBack }) {
     <div className="card elevated">
       <div className="card-header">
         <div className="header-with-back">
-          {onBack && (
-            <button className="back-button" onClick={onBack} title="Back to programs">
-              ← Back
-            </button>
-          )}
+         
           <div>
             <h2>Select a Trial</h2>
             <p>Choose a clinical trial to analyze demand forecasting</p>
@@ -66,7 +62,7 @@ function TrialSelector({ programSeq, onSelectTrial, onBack }) {
 
       {error && (
         <div className="alert alert-danger">
-          <span>⚠️</span>
+          <span></span>
           <span>{error}</span>
         </div>
       )}
@@ -91,7 +87,7 @@ function TrialSelector({ programSeq, onSelectTrial, onBack }) {
 
           {filteredTrials.length === 0 ? (
             <div className="alert alert-info">
-              <span>ℹ️</span>
+              <span></span>
               <span>
                 {trials.length === 0
                   ? 'No trials available for this program'

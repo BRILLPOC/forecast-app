@@ -42,7 +42,8 @@ from src.demand_calculator import (
     get_trial_enrollments,
     get_trial_dosing_intervals,
     get_trial_items,
-    get_trial_countries
+    get_trial_countries,
+    format_month
 )
 from src.diagnostics import diagnose_snowflake
 from src.connection import test_connection
@@ -82,12 +83,13 @@ class BaselineDemandRequest(BaseModel):
 class BaselineDemandResponse(BaseModel):
     trial_seq: int
     total_demand: int
-    total_patients: int
-    peak_month: int
+    total_planned_subjects: int
+    total_actual_subjects: int
+    peak_month: str
     peak_demand: int
     by_country: Dict[str, int]
     by_item: Dict[str, int]
-    by_month: Dict[int, int]
+    by_month: Dict[str, int]
     detailed_records: Optional[List[Dict[str, Any]]] = None
 
 class ScenarioRequest(BaseModel):
@@ -117,6 +119,16 @@ class ComparisonResponse(BaseModel):
     by_month_comparison: Dict[int, Dict[str, int]]
     by_country_comparison: Dict[str, Dict[str, int]]
     by_item_comparison: Dict[str, Dict[str, int]]
+
+class EnrollmentVersionResponse(BaseModel):
+    trial_seq: int
+    versions: List[int]
+    latest_version: int
+
+class DosingVersionResponse(BaseModel):
+    trial_seq: int
+    versions: List[int]
+    latest_version: int
 
 class ProgramResponse(BaseModel):
     program_seq: int
@@ -293,6 +305,88 @@ async def get_table_data(table_name: str, limit: int = 10):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ===== VERSION ENDPOINTS =====
+
+@app.get("/trials/{trial_seq}/enrollment-versions", response_model=EnrollmentVersionResponse)
+async def get_enrollment_versions(trial_seq: int):
+    """
+    Get all available enrollment versions for a trial
+    Returns a list of version numbers and the latest version
+    """
+    try:
+        logger.info(f"[VERSIONS] Fetching enrollment versions for trial_seq={trial_seq}...")
+        query = f"""
+            SELECT DISTINCT ENROLL_VERSION 
+            FROM PLANNED_ENROLLMENTS 
+            WHERE TRIAL_SEQ = {trial_seq}
+            ORDER BY ENROLL_VERSION DESC
+        """
+        df = execute_query(query)
+        
+        if len(df) == 0:
+            logger.warning(f"[VERSIONS] No enrollment versions found for trial_seq={trial_seq}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No enrollment data found for trial_seq={trial_seq}"
+            )
+        
+        versions = sorted(df['ENROLL_VERSION'].astype(int).tolist())
+        latest_version = max(versions)
+        
+        logger.info(f"[VERSIONS] Found {len(versions)} enrollment versions: {versions}")
+        
+        return EnrollmentVersionResponse(
+            trial_seq=trial_seq,
+            versions=versions,
+            latest_version=latest_version
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Failed to get enrollment versions: {str(e)}"
+        logger.error(f"[VERSIONS] ERROR - {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
+@app.get("/trials/{trial_seq}/dosing-versions", response_model=DosingVersionResponse)
+async def get_dosing_versions(trial_seq: int):
+    """
+    Get all available dosing versions for a trial
+    Returns a list of version numbers and the latest version
+    """
+    try:
+        logger.info(f"[VERSIONS] Fetching dosing versions for trial_seq={trial_seq}...")
+        query = f"""
+            SELECT DISTINCT DOSAGE_VERSION 
+            FROM TRIAL_DOSING_INTERVALS 
+            WHERE TRIAL_SEQ = {trial_seq}
+            ORDER BY DOSAGE_VERSION DESC
+        """
+        df = execute_query(query)
+        
+        if len(df) == 0:
+            logger.warning(f"[VERSIONS] No dosing versions found for trial_seq={trial_seq}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No dosing data found for trial_seq={trial_seq}"
+            )
+        
+        versions = sorted(df['DOSAGE_VERSION'].astype(int).tolist())
+        latest_version = max(versions)
+        
+        logger.info(f"[VERSIONS] Found {len(versions)} dosing versions: {versions}")
+        
+        return DosingVersionResponse(
+            trial_seq=trial_seq,
+            versions=versions,
+            latest_version=latest_version
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Failed to get dosing versions: {str(e)}"
+        logger.error(f"[VERSIONS] ERROR - {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
+
 # ===== BASELINE DEMAND ENDPOINTS =====
 
 @app.post("/baseline-demand", response_model=BaselineDemandResponse)
@@ -323,8 +417,7 @@ async def calculate_baseline_demand(request: BaselineDemandRequest, include_reco
             trial_seq=request.trial_seq,
             enroll_version=request.enroll_version,
             dosage_version=request.dosage_version,
-            verbose=False,
-            debug=debug
+            verbose=False
         )
         logger.info(f"[BASELINE-DEMAND] Baseline demand computed successfully. Shape: {baseline_demand.shape if hasattr(baseline_demand, 'shape') else 'unknown'}")
         
@@ -343,12 +436,16 @@ async def calculate_baseline_demand(request: BaselineDemandRequest, include_reco
         response = BaselineDemandResponse(
             trial_seq=request.trial_seq,
             total_demand=int(summary['total_demand']),
-            total_patients=int(summary['total_patients']),
-            peak_month=int(summary['peak_month']),
+            total_planned_subjects=int(summary['total_planned_subjects']),
+            total_actual_subjects=int(summary['total_actual_subjects']),
+            peak_month=str(summary['peak_month']),
             peak_demand=int(summary['peak_demand']),
             by_country=summary['by_country'],
             by_item=summary['by_item'],
-            by_month={int(k): int(v) for k, v in summary['by_month'].items()}
+            by_month={
+                (format_month(int(k)) if isinstance(k, (int, np.integer)) else str(k)): int(v)
+                for k, v in summary['by_month'].items()
+            }
         )
         
         if include_records:

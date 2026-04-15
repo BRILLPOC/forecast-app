@@ -18,7 +18,44 @@ Key Functions:
 
 import pandas as pd
 import numpy as np
-from .data_loader import load_table_data, execute_query
+import logging
+import pdb
+import os
+from .data_loader import  execute_query
+
+def format_month(month_number: int, base_date=None) -> str:
+    """
+    Convert a relative month number to a formatted date string (e.g., "September 2025")
+    
+    Args:
+        month_number: Relative month number (1-based, where 1 = January of base year)
+        base_date: Base date as datetime or string (default: 2025-01-01)
+    
+    Returns:
+        Formatted string like "September 2025"
+    """
+    from datetime import datetime
+    
+    # Default base date is 2025-01-01
+    if base_date is None:
+        base_date = datetime(2025, 1, 1)
+    elif isinstance(base_date, str):
+        base_date = datetime.strptime(base_date, '%Y-%m-%d')
+    
+    # Month number is 1-based: 1 = Jan, 2 = Feb, ..., 12 = Dec, 13 = Jan next year, etc.
+    # Convert to 0-based and add to base date
+    months_offset = month_number - 1  # Convert to 0-based
+    
+    # Calculate year and month
+    total_months = base_date.month - 1 + months_offset  # month is 1-based, so subtract 1
+    year = base_date.year + total_months // 12
+    month = (total_months % 12) + 1
+    
+    # Create the result date
+    result_date = datetime(year, month, 1)
+    
+    # Format as "Month Year" (e.g., "September 2025")
+    return result_date.strftime('%B %Y')
 
 
 def get_trial_enrollments(trial_seq: int, enroll_version: int = None) -> pd.DataFrame:
@@ -203,22 +240,30 @@ def compute_baseline_demand(
     if verbose:
         print(f"\n3. Joining enrollments with dosing intervals...")
     
-    # Prepare join keys (convert to appropriate types if needed)
-    enrollments['JOIN_KEY'] = (
-        enrollments['COHORT'].astype(str) + '_' + 
-        enrollments['TREATMENT_GROUP'].astype(str)
-    )
-    dosing['JOIN_KEY'] = (
-        dosing['COHORT'].astype(str) + '_' + 
-        dosing['TREATMENT_GROUP'].astype(str)
-    )
-    
-    # Join enrollment with dosing intervals
-    merged = enrollments.merge(
-        dosing[['ITEM_SEQ', 'MONTH_NUMBER', 'QTY', 'OVERAGE', 'JOIN_KEY']],
-        on='JOIN_KEY',
-        how='inner'
-    )
+    try:
+        # Prepare join keys (convert to appropriate types if needed)
+        enrollments['JOIN_KEY'] = (
+            enrollments['COHORT'].astype(str) + '_' + 
+            enrollments['TREATMENT_GROUP'].astype(str)
+        )
+        dosing['JOIN_KEY'] = (
+            dosing['COHORT'].astype(str) + '_' + 
+            dosing['TREATMENT_GROUP'].astype(str)
+        )
+        
+        # Join enrollment with dosing intervals
+        merged = enrollments.merge(
+            dosing[['ITEM_SEQ', 'MONTH_NUMBER', 'QTY', 'OVERAGE', 'JOIN_KEY']],
+            on='JOIN_KEY',
+            how='inner'
+        )
+        
+        if len(merged) == 0:
+            logger.error(f"[DEMAND] Merge resulted in 0 rows - no matching join keys")
+            raise ValueError("No matching data found when joining enrollments with dosing intervals")
+    except Exception as e:
+        logger.error(f"[DEMAND] Error during merge: {str(e)}", exc_info=True)
+        raise
     
     if verbose:
         print(f"   ✓ Merged data: {len(merged)} rows")
@@ -261,14 +306,19 @@ def compute_baseline_demand(
     
     baseline_demand.columns = [
         'CONSUMPTION_MONTH', 'COUNTRY', 'ITEM_SEQ', 'ITEM_ID',
-        'DEMAND_QTY', 'PATIENT_COUNT', 'BASE_QTY_PER_PATIENT'
+        'DEMAND_QTY', 'PLANNED_SUBJECTS', 'BASE_QTY_PER_PATIENT'
     ]
+    
+    # For now, actual subjects equals planned subjects
+    # This can be modified to use actual enrollment data if available
+    baseline_demand['ACTUAL_SUBJECTS'] = baseline_demand['PLANNED_SUBJECTS']
     
     # Convert to integers where appropriate
     baseline_demand['CONSUMPTION_MONTH'] = baseline_demand['CONSUMPTION_MONTH'].astype(int)
     baseline_demand['ITEM_SEQ'] = baseline_demand['ITEM_SEQ'].astype(int)
     baseline_demand['DEMAND_QTY'] = baseline_demand['DEMAND_QTY'].astype(int)
-    baseline_demand['PATIENT_COUNT'] = baseline_demand['PATIENT_COUNT'].astype(int)
+    baseline_demand['PLANNED_SUBJECTS'] = baseline_demand['PLANNED_SUBJECTS'].astype(int)
+    baseline_demand['ACTUAL_SUBJECTS'] = baseline_demand['ACTUAL_SUBJECTS'].astype(int)
     
     # Sort by month, country, item
     baseline_demand = baseline_demand.sort_values(
@@ -280,7 +330,8 @@ def compute_baseline_demand(
         print(f"\n5. Validation Summary:")
         print(f"   ✓ Total demand records: {len(baseline_demand)}")
         print(f"   ✓ Total demand quantity: {baseline_demand['DEMAND_QTY'].sum():,.0f} units")
-        print(f"   ✓ Total patients: {baseline_demand['PATIENT_COUNT'].sum():,.0f}")
+        print(f"   ✓ Total planned subjects: {baseline_demand['PLANNED_SUBJECTS'].sum():,.0f}")
+        print(f"   ✓ Total actual subjects: {baseline_demand['ACTUAL_SUBJECTS'].sum():,.0f}")
         print(f"   ✓ Consumption months range: {baseline_demand['CONSUMPTION_MONTH'].min()} - {baseline_demand['CONSUMPTION_MONTH'].max()}")
         print(f"   ✓ Countries: {baseline_demand['COUNTRY'].nunique()}")
         print(f"   ✓ Items: {baseline_demand['ITEM_ID'].nunique()}")
@@ -289,7 +340,7 @@ def compute_baseline_demand(
         sample = merged.iloc[0]
         calc_check = sample['PLANNED_ENROLLMENTS'] * sample['QTY'] * (1 + sample['OVERAGE'])
         print(f"\n6. Spot Check (First Enrollment Record):")
-        print(f"   - Enrollments: {sample['PLANNED_ENROLLMENTS']}")
+        print(f"   - Planned Enrollments: {sample['PLANNED_ENROLLMENTS']}")
         print(f"   - Base Qty: {sample['QTY']}")
         print(f"   - Overage: {sample['OVERAGE']}")
         print(f"   - Calculated Demand: {sample['PLANNED_ENROLLMENTS']} × {sample['QTY']} × (1 + {sample['OVERAGE']}) = {calc_check:.2f}")
@@ -312,11 +363,15 @@ def get_baseline_demand_summary(baseline_demand: pd.DataFrame) -> dict:
     """
     summary = {
         'total_demand': baseline_demand['DEMAND_QTY'].sum(),
-        'total_patients': baseline_demand['PATIENT_COUNT'].sum(),
+        'total_planned_subjects': baseline_demand['PLANNED_SUBJECTS'].sum(),
+        'total_actual_subjects': baseline_demand['ACTUAL_SUBJECTS'].sum(),
         'by_country': baseline_demand.groupby('COUNTRY')['DEMAND_QTY'].sum().to_dict(),
         'by_item': baseline_demand.groupby('ITEM_ID')['DEMAND_QTY'].sum().to_dict(),
-        'by_month': baseline_demand.groupby('CONSUMPTION_MONTH')['DEMAND_QTY'].sum().to_dict(),
-        'peak_month': baseline_demand.groupby('CONSUMPTION_MONTH')['DEMAND_QTY'].sum().idxmax(),
+        'by_month': {
+            format_month(int(month)): int(demand) 
+            for month, demand in baseline_demand.groupby('CONSUMPTION_MONTH')['DEMAND_QTY'].sum().to_dict().items()
+        },
+        'peak_month': format_month(int(baseline_demand.groupby('CONSUMPTION_MONTH')['DEMAND_QTY'].sum().idxmax())),
         'peak_demand': baseline_demand.groupby('CONSUMPTION_MONTH')['DEMAND_QTY'].sum().max(),
     }
     return summary

@@ -3,6 +3,8 @@ import * as api from '../services/api';
 import ProgramSelector from './ProgramSelector';
 import TrialSelector from './TrialSelector';
 import BaselineDemand from './BaselineDemand';
+import ScenarioBuilder from './ScenarioBuilder';
+import ComparisonAnalysis from './ComparisonAnalysis';
 import '../styles/index.css';
 
 function Dashboard() {
@@ -91,7 +93,7 @@ function Dashboard() {
     }
   };
 
-  const handleCompare = async () => {
+  const handleCompare = async (params) => {
     if (!baselineData || !scenarioData) {
       setError('Please calculate both baseline and scenario data first');
       return;
@@ -101,8 +103,18 @@ function Dashboard() {
     try {
       const trialSeq = selectedTrial.TRIAL_SEQ || selectedTrial.trial_seq;
       const result = await api.compareScenario(
-        { trial_seq: trialSeq },
-        { trial_seq: trialSeq }
+        { trial_seq: trialSeq, 
+          enroll_version: params.baselineData.enroll_version, 
+          dosage_version: params.baselineData.dosage_version 
+        },
+        { trial_seq: params.scenarioData.trial_seq, 
+          enroll_version: params.scenarioData.enroll_version, 
+          dosage_version: params.scenarioData.dosage_version,
+          scenario_name: params.scenarioData.scenario_name,
+          affected_countries: params.scenarioData.affected_countries,
+          reduction_factor: params.scenarioData.reduction_factor,
+          start_month: params.scenarioData.start_month 
+        }
       );
       setComparisonData(result);
       setActiveTab('comparison');
@@ -133,7 +145,7 @@ function Dashboard() {
       <div className="app-content">
         {error && (
           <div className="alert alert-danger">
-            <span>⚠️</span>
+            <span></span>
             <div>
               <strong>Error:</strong> {error}
               <button
@@ -259,13 +271,7 @@ function Dashboard() {
               />
             )}
 
-            {activeTab === 'charts' && (
-              <DemandCharts
-                baselineData={baselineData}
-                scenarioData={scenarioData}
-                comparisonData={comparisonData}
-              />
-            )}
+            
           </div>
         )}
       </div>

@@ -299,4 +299,25 @@ export const getDosingVersions = async (trialSeq) => {
   }
 };
 
+// ===== ENROLLMENT SUMMARY =====
+
+/**
+ * Get enrollment summary for a trial
+ * @param {number} trialSeq - Trial sequence number
+ * @param {number} enrollVersion - Enrollment version (optional)
+ * @returns {Promise<Object>} Enrollment summary with min/max/total values
+ */
+export const getEnrollmentSummary = async (trialSeq, enrollVersion = null) => {
+  try {
+    console.log(`[API:EnrollmentSummary] Fetching enrollment summary for trial_seq=${trialSeq}...`);
+    const params = enrollVersion ? { enroll_version: enrollVersion } : {};
+    const response = await apiClient.get(`/trials/${trialSeq}/enrollment-summary`, { params });
+    console.log(`[API:EnrollmentSummary] Summary retrieved:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`[API:EnrollmentSummary] Error fetching enrollment summary:`, error.message);
+    throw new Error(`Failed to get enrollment summary: ${error.message}`);
+  }
+};
+
 export default apiClient;

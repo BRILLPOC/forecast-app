@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
+import Simulator from './Simulator';
 
 function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, loading }) {
   const [scenarioName, setScenarioName] = useState('');
@@ -13,16 +14,19 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [versionsError, setVersionsError] = useState(null);
 
+  // Nested tab state for Scenario Modeling
+  const [modelingTab, setModelingTab] = useState('scenario'); // 'scenario' or 'simulator'
+
   // Example countries (you can fetch these from API)
   const countryOptions = [
-    'Germany',
-    'France',
-    'Italy',
-    'Spain',
-    'UK',
-    'Canada',
-    'USA',
-    'Australia',
+    'Germany (DE)',
+    'France (FR)',
+    'Italy (IT)',
+    'Spain (ES)',
+    'UK (GB)',
+    'Canada (CA)',
+    'USA (US)',
+    'Australia (AU)'
   ];
 
   // Fetch available versions when trial changes
@@ -80,30 +84,16 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
       affected_countries: affectedCountries,
       reduction_factor: parseFloat(reductionFactor),
       start_month: parseInt(startMonth),
-      enroll_version: enrollmentVersions ? parseInt(enrollmentVersions) : null,
-      dosage_version: dosingVersions ? parseInt(dosingVersions) : null,
+      enroll_version: enrollVersion ? parseInt(enrollVersion) : null,
+      dosage_version: dosageVersion ? parseInt(dosageVersion) : null,
     });
   };
 
-  const handleCompare = (e) => {
-    e.preventDefault();
-    
-    onCompare({'baselineData': {
-      trial_seq: trialSeq,
-      enroll_version: enrollmentVersions ? parseInt(enrollmentVersions) : null,
-      dosage_version: dosingVersions ? parseInt(dosingVersions) : null,
-    },
-    'scenarioData': {
-      trial_seq: trialSeq,
-      scenario_name: scenarioName || 'Unnamed Scenario',
-      affected_countries: affectedCountries,
-      reduction_factor: parseFloat(reductionFactor),
-      start_month: parseInt(startMonth),
-      enroll_version: enrollmentVersions ? parseInt(enrollmentVersions) : null,
-      dosage_version: dosingVersions ? parseInt(dosingVersions) : null,
-    }
-  });
-};
+  const handleSimulatorSubmit = async (params) => {
+    // For simulator, we just calculate the projected demand
+    // This could call a different API or be handled locally
+    console.log('Simulator params:', params);
+  };
 
   return (
     <div className="card elevated">
@@ -114,16 +104,59 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
 
       {!baselineData && (
         <div className="alert alert-info">
-          <span></span>
+          <span>ℹ️</span>
           <span>Please calculate baseline demand first</span>
         </div>
       )}
 
-      <div className="card-section">
-        <form onSubmit={handleSubmit}>
+      {/* Nested Tabs for Scenario Modeling */}
+      <div className="nested-tabs" style={{ marginBottom: '1.5rem', borderBottom: '2px solid var(--border-color)' }}>
+        <button
+          type="button"
+          className={`nested-tab-btn ${modelingTab === 'scenario' ? 'active' : ''}`}
+          onClick={() => setModelingTab('scenario')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: '3px solid transparent',
+            color: modelingTab === 'scenario' ? 'var(--primary)' : 'var(--text-secondary)',
+            borderBottomColor: modelingTab === 'scenario' ? 'var(--primary)' : 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+        >
+          📝 Scenario Builder
+        </button>
+        <button
+          type="button"
+          className={`nested-tab-btn ${modelingTab === 'simulator' ? 'active' : ''}`}
+          onClick={() => setModelingTab('simulator')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: '3px solid transparent',
+            color: modelingTab === 'simulator' ? 'var(--primary)' : 'var(--text-secondary)',
+            borderBottomColor: modelingTab === 'simulator' ? 'var(--primary)' : 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+        >
+          📊 Simulator
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {modelingTab === 'scenario' && (
+        <div className="card-section">
+          <form onSubmit={handleSubmit}>
           {versionsError && (
             <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
-              <span></span>
               <span>{versionsError}</span>
             </div>
           )}
@@ -275,10 +308,11 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
             className="btn btn-primary btn-large btn-block"
             disabled={loading || versionsLoading || affectedCountries.length === 0}
           >
-            {loading ? 'Calculating...' : 'Apply Scenario'}
+            {loading ? '⏳ Calculating...' : '🎯 Apply Scenario'}
           </button>
         </form>
       </div>
+      )}
 
       {data && (
         <div className="card-section">
@@ -287,20 +321,20 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
           <div className="grid cols-2">
             <div className="stat-box">
               <div className="stat-label">Original Total Enrollments</div>
-              <div className="stat-value">{data.original_total.toLocaleString()}</div>
+              <div className="stat-value">{data.original_total?.toLocaleString()}</div>
             </div>
 
             <div className="stat-box">
               <div className="stat-label">Scenario Total Enrollments</div>
-              <div className="stat-value">{data.scenario_total.toLocaleString()}</div>
+              <div className="stat-value">{data.scenario_total?.toLocaleString()}</div>
             </div>
 
             <div className="stat-box">
               <div className="stat-label">Total Reduction</div>
               <div className="stat-value" style={{ color: 'var(--danger)' }}>
-                {data.total_reduction.toLocaleString()}
+                {data.total_reduction?.toLocaleString()}
               </div>
-              <div className="stat-label">{data.reduction_percentage.toFixed(1)}% reduction</div>
+              <div className="stat-label">{data.reduction_percentage?.toFixed(1)}% reduction</div>
             </div>
 
             <div className="stat-box">
@@ -334,14 +368,23 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
           {baselineData && (
             <button
               className="btn btn-secondary btn-large btn-block"
-              onClick={handleCompare}
+              onClick={onCompare}
               style={{ marginTop: '1.5rem' }}
               disabled={loading}
             >
-              Compare with Baseline
+              🔍 Compare with Baseline
             </button>
           )}
         </div>
+      )}
+
+      {/* Simulator Tab Content */}
+      {modelingTab === 'simulator' && (
+        <Simulator
+          trialSeq={trialSeq}
+          onSimulate={handleSimulatorSubmit}
+          loading={loading}
+        />
       )}
     </div>
   );

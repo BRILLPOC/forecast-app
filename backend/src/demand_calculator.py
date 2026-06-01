@@ -58,19 +58,20 @@ def format_month(month_number: int, base_date=None) -> str:
     return result_date.strftime('%B %Y')
 
 
-def get_trial_enrollments(trial_seq: int, enroll_version: int = None) -> pd.DataFrame:
+def get_trial_enrollments(trial_seq: int, enroll_version: int = None, program_seq: int = None) -> pd.DataFrame:
     """
     Load planned enrollments for a specific trial.
     
     Args:
         trial_seq: Trial sequence number
         enroll_version: Enrollment version (if None, uses latest)
+        program_seq: Program sequence number (optional)
     
     Returns:
         DataFrame with columns: TRIAL_SEQ, ENROLL_VERSION, ENROLL_MONTH, COHORT, 
                                TREATMENT_GROUP, COUNTRY, PLANNED_ENROLLMENTS
     """
-    if enroll_version is None:
+    if enroll_version:
         # Get latest enrollment version
         query = f"""
             SELECT DISTINCT ENROLL_VERSION 
@@ -84,13 +85,21 @@ def get_trial_enrollments(trial_seq: int, enroll_version: int = None) -> pd.Data
             raise ValueError(f"No enrollment data found for trial_seq={trial_seq}")
         enroll_version = result.iloc[0, 0]
     
+    # Build WHERE clause
+    where_clauses = [f"TRIAL_SEQ = {trial_seq}"]
+    if enroll_version:
+        where_clauses.append(f"ENROLL_VERSION = {enroll_version}")
+    else:
+        where_clauses.append("ENROLL_VERSION IS NOT NULL")
+    if program_seq:
+        where_clauses.append(f"PROGRAM_SEQ = {program_seq}")
+    where_sql = " AND ".join(where_clauses)
     query = f"""
         SELECT 
             TRIAL_SEQ, ENROLL_VERSION, ENROLL_MONTH, COHORT, 
             TREATMENT_GROUP, COUNTRY, PLANNED_ENROLLMENTS
         FROM PLANNED_ENROLLMENTS
-        WHERE TRIAL_SEQ = {trial_seq} 
-        AND ENROLL_VERSION = {enroll_version}
+        WHERE {where_sql}
         ORDER BY ENROLL_MONTH, COUNTRY, COHORT, TREATMENT_GROUP
     """
     return execute_query(query)

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
 import Simulator from './Simulator';
+import EnrollmentDistribution from './EnrollmentDistribution';
+
 
 function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, loading }) {
   const [scenarioName, setScenarioName] = useState('');
@@ -104,7 +106,7 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
 
       {!baselineData && (
         <div className="alert alert-info">
-          <span>ℹ️</span>
+          <span></span>
           <span>Please calculate baseline demand first</span>
         </div>
       )}
@@ -128,7 +130,26 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
             transition: 'all 0.2s'
           }}
         >
-          📝 Scenario Builder
+          Scenario Builder
+        </button>
+        <button
+          type="button"
+          className={`nested-tab-btn ${modelingTab === 'distribution' ? 'active' : ''}`}
+          onClick={() => setModelingTab('distribution')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: '3px solid transparent',
+            color: modelingTab === 'distribution' ? 'var(--primary)' : 'var(--text-secondary)',
+            borderBottomColor: modelingTab === 'distribution' ? 'var(--primary)' : 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+        >
+          📅 Enrollment Distribution
         </button>
         <button
           type="button"
@@ -147,7 +168,7 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
             transition: 'all 0.2s'
           }}
         >
-          📊 Simulator
+          Simulator
         </button>
       </div>
 
@@ -343,6 +364,8 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
               <div className="stat-label">{affectedCountries.join(', ')}</div>
             </div>
           </div>
+          </div>
+        )}
 
           {baselineData && (
             <div style={{ marginTop: '2rem' }}>
@@ -375,8 +398,11 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
               🔍 Compare with Baseline
             </button>
           )}
-        </div>
-      )}
+         {modelingTab === 'distribution' && (
+          <div className="card-section">
+            <EnrollmentDistribution />
+          </div>
+        )}
 
       {/* Simulator Tab Content */}
       {modelingTab === 'simulator' && (

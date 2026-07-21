@@ -5,6 +5,7 @@ import TrialSelector from './TrialSelector';
 import BaselineDemand from './BaselineDemand';
 import ScenarioBuilder from './ScenarioBuilder';
 import ComparisonAnalysis from './ComparisonAnalysis';
+import DemandCharts from './Charts';
 import '../styles/index.css';
 
 function Dashboard() {
@@ -16,6 +17,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('baseline');
+  const [scenarioParams, setScenarioParams] = useState(null);
 
   const handleProgramSelect = (program) => {
     setSelectedProgram(program);
@@ -23,6 +25,7 @@ function Dashboard() {
     setBaselineData(null);
     setScenarioData(null);
     setComparisonData(null);
+    setScenarioParams(null);
   };
 
   const handleTrialSelect = (trial) => {
@@ -30,6 +33,7 @@ function Dashboard() {
     setBaselineData(null);
     setScenarioData(null);
     setComparisonData(null);
+    setScenarioParams(null);
     setActiveTab('baseline');
   };
 
@@ -39,6 +43,7 @@ function Dashboard() {
     setBaselineData(null);
     setScenarioData(null);
     setComparisonData(null);
+    setScenarioParams(null);
   };
 
   const handleBackToTrials = () => {
@@ -46,6 +51,7 @@ function Dashboard() {
     setBaselineData(null);
     setScenarioData(null);
     setComparisonData(null);
+    setScenarioParams(null);
     setActiveTab('baseline');
   };
 
@@ -74,8 +80,10 @@ function Dashboard() {
     setError(null);
     try {
       const trialSeq = selectedTrial.TRIAL_SEQ || selectedTrial.trial_seq;
+      const programSeq = selectedProgram?.PROGRAM_SEQ || selectedProgram?.program_seq;
       const result = await api.applyScenario(
         trialSeq,
+        programSeq,
         params.scenario_name,
         params.affected_countries,
         params.reduction_factor,
@@ -85,6 +93,16 @@ function Dashboard() {
         true
       );
       setScenarioData(result);
+      setScenarioParams({
+        trial_seq: trialSeq,
+        program_seq: programSeq,
+        scenario_name: params.scenario_name,
+        affected_countries: params.affected_countries,
+        reduction_factor: params.reduction_factor,
+        start_month: params.start_month,
+        enroll_version: params.enroll_version,
+        dosage_version: params.dosage_version
+      });
       setActiveTab('scenario');
     } catch (err) {
       setError(err.message);
@@ -93,7 +111,7 @@ function Dashboard() {
     }
   };
 
-  const handleCompare = async (params) => {
+  const handleCompare = async () => {
     if (!baselineData || !scenarioData) {
       setError('Please calculate both baseline and scenario data first');
       return;
@@ -103,18 +121,12 @@ function Dashboard() {
     try {
       const trialSeq = selectedTrial.TRIAL_SEQ || selectedTrial.trial_seq;
       const result = await api.compareScenario(
-        { trial_seq: trialSeq, 
-          enroll_version: params.baselineData.enroll_version, 
-          dosage_version: params.baselineData.dosage_version 
+        { 
+          trial_seq: trialSeq,
+          enroll_version: scenarioParams?.enroll_version || null,
+          dosage_version: scenarioParams?.dosage_version || null
         },
-        { trial_seq: params.scenarioData.trial_seq, 
-          enroll_version: params.scenarioData.enroll_version, 
-          dosage_version: params.scenarioData.dosage_version,
-          scenario_name: params.scenarioData.scenario_name,
-          affected_countries: params.scenarioData.affected_countries,
-          reduction_factor: params.scenarioData.reduction_factor,
-          start_month: params.scenarioData.start_month 
-        }
+        scenarioParams
       );
       setComparisonData(result);
       setActiveTab('comparison');
@@ -145,7 +157,7 @@ function Dashboard() {
       <div className="app-content">
         {error && (
           <div className="alert alert-danger">
-            <span></span>
+            <span>⚠️</span>
             <div>
               <strong>Error:</strong> {error}
               <button
@@ -228,7 +240,7 @@ function Dashboard() {
               >
                 Scenario Modeling
               </button>
-              {/* <button
+              <button
                 className={`tab-btn ${activeTab === 'comparison' ? 'active' : ''}`}
                 onClick={() => setActiveTab('comparison')}
               >
@@ -238,8 +250,8 @@ function Dashboard() {
                 className={`tab-btn ${activeTab === 'charts' ? 'active' : ''}`}
                 onClick={() => setActiveTab('charts')}
               >
-                Visualizations
-              </button> */}
+                Analytics Dashboard
+              </button>
             </div>
 
             {activeTab === 'baseline' && (
@@ -254,6 +266,7 @@ function Dashboard() {
             {activeTab === 'scenario' && (
               <ScenarioBuilder
                 trialSeq={selectedTrial.TRIAL_SEQ || selectedTrial.trial_seq}
+                programSeq={selectedProgram?.PROGRAM_SEQ || selectedProgram?.program_seq}
                 baselineData={baselineData}
                 data={scenarioData}
                 onSubmit={handleScenarioSubmit}
@@ -271,7 +284,13 @@ function Dashboard() {
               />
             )}
 
-            
+            {activeTab === 'charts' && (
+              <DemandCharts
+                baselineData={baselineData}
+                scenarioData={scenarioData}
+                comparisonData={comparisonData}
+              />
+            )}
           </div>
         )}
       </div>

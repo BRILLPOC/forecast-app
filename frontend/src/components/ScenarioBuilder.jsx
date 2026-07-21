@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
 import Simulator from './Simulator';
 import EnrollmentDistribution from './EnrollmentDistribution';
+import ScenarioSimulation from './ScenarioSimulation';
 
-
-function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, loading }) {
+function ScenarioBuilder({ trialSeq, programSeq, baselineData, data, onSubmit, onCompare, loading }) {
   const [scenarioName, setScenarioName] = useState('');
   const [affectedCountries, setAffectedCountries] = useState([]);
   const [reductionFactor, setReductionFactor] = useState('0.30');
@@ -95,6 +95,8 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
     // For simulator, we just calculate the projected demand
     // This could call a different API or be handled locally
     console.log('Simulator params:', params);
+    // You can add simulator-specific API call here if needed
+    alert(`Simulation parameters set:\n- Enrollment Min: ${params.enrollment_min}\n- Enrollment Max: ${params.enrollment_max}\n- Dropout Rate: ${params.dropout_rate}%`);
   };
 
   return (
@@ -106,7 +108,7 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
 
       {!baselineData && (
         <div className="alert alert-info">
-          <span></span>
+          <span>ℹ️</span>
           <span>Please calculate baseline demand first</span>
         </div>
       )}
@@ -130,7 +132,7 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
             transition: 'all 0.2s'
           }}
         >
-          Scenario Builder
+          📝 Scenario Builder
         </button>
         <button
           type="button"
@@ -168,249 +170,282 @@ function ScenarioBuilder({ trialSeq, baselineData, data, onSubmit, onCompare, lo
             transition: 'all 0.2s'
           }}
         >
-          Simulator
+          📊 Simulator
+        </button>
+        <button
+          type="button"
+          className={`nested-tab-btn ${modelingTab === 'whatif' ? 'active' : ''}`}
+          onClick={() => setModelingTab('whatif')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: '3px solid transparent',
+            color: modelingTab === 'whatif' ? 'var(--primary)' : 'var(--text-secondary)',
+            borderBottomColor: modelingTab === 'whatif' ? 'var(--primary)' : 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+            transition: 'all 0.2s'
+          }}
+        >
+          🎯 What-If Scenarios
         </button>
       </div>
 
       {/* Tab Content */}
       {modelingTab === 'scenario' && (
-        <div className="card-section">
-          <form onSubmit={handleSubmit}>
-          {versionsError && (
-            <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
-              <span>{versionsError}</span>
-            </div>
-          )}
-
-          <div className="form-group">
-            <label htmlFor="scenario-name">Scenario Name:</label>
-            <input
-              id="scenario-name"
-              type="text"
-              placeholder="e.g., EU Region Slowdown"
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Affected Countries:</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-              {countryOptions.map((country) => (
-                <label key={country} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={affectedCountries.includes(country)}
-                    onChange={() => handleCountryToggle(country)}
-                    disabled={loading}
-                    style={{ width: 'auto', margin: 0 }}
-                  />
-                  {country}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="form-row three">
-            <div className="form-group">
-              <label htmlFor="reduction">Reduction Factor (0-1):</label>
-              <input
-                id="reduction"
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                value={reductionFactor}
-                onChange={(e) => setReductionFactor(e.target.value)}
-                disabled={loading}
-              />
-              <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
-                {`${(parseFloat(reductionFactor) * 100).toFixed(0)}% reduction`}
-              </small>
-            </div>
+        <>
+          <div className="card-section">
+            <form onSubmit={handleSubmit}>
+            {versionsError && (
+              <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>
+                <span>{versionsError}</span>
+              </div>
+            )}
 
             <div className="form-group">
-              <label htmlFor="start-month">Start Month:</label>
+              <label htmlFor="scenario-name">Scenario Name:</label>
               <input
-                id="start-month"
-                type="number"
-                min="1"
-                value={startMonth}
-                onChange={(e) => setStartMonth(e.target.value)}
+                id="scenario-name"
+                type="text"
+                placeholder="e.g., EU Region Slowdown"
+                value={scenarioName}
+                onChange={(e) => setScenarioName(e.target.value)}
                 disabled={loading}
               />
             </div>
 
             <div className="form-group">
-              <label htmlFor="visual-preview">Visual Preview:</label>
-              <div style={{
-                background: '#f0f0f0',
-                padding: '1rem',
-                borderRadius: '4px',
-                textAlign: 'center',
-                fontSize: '0.9rem'
-              }}>
-                {affectedCountries.length > 0 ? `Reducing ${affectedCountries.length} countries by ${(parseFloat(reductionFactor) * 100).toFixed(0)}%` : 'Select countries to preview'}
+              <label>Affected Countries:</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                {countryOptions.map((country) => (
+                  <label key={country} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={affectedCountries.includes(country)}
+                      onChange={() => handleCountryToggle(country)}
+                      disabled={loading}
+                      style={{ width: 'auto', margin: 0 }}
+                    />
+                    {country}
+                  </label>
+                ))}
               </div>
             </div>
-          </div>
 
-          <div className="form-row two">
-            <div className="form-group">
-              <label htmlFor="enroll-version-scenario">Enrollment Version:</label>
-              {versionsLoading ? (
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  Loading versions...
+            <div className="form-row three">
+              <div className="form-group">
+                <label htmlFor="reduction">Reduction Factor (0-1):</label>
+                <input
+                  id="reduction"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={reductionFactor}
+                  onChange={(e) => setReductionFactor(e.target.value)}
+                  disabled={loading}
+                />
+                <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
+                  {`${(parseFloat(reductionFactor) * 100).toFixed(0)}% reduction`}
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="start-month">Start Month:</label>
+                <input
+                  id="start-month"
+                  type="number"
+                  min="1"
+                  value={startMonth}
+                  onChange={(e) => setStartMonth(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="visual-preview">Visual Preview:</label>
+                <div style={{
+                  background: '#f0f0f0',
+                  padding: '1rem',
+                  borderRadius: '4px',
+                  textAlign: 'center',
+                  fontSize: '0.9rem'
+                }}>
+                  {affectedCountries.length > 0 ? `Reducing ${affectedCountries.length} countries by ${(parseFloat(reductionFactor) * 100).toFixed(0)}%` : 'Select countries to preview'}
                 </div>
-              ) : (
-                <>
-                  <select
-                    id="enroll-version-scenario"
-                    value={enrollVersion}
-                    onChange={(e) => setEnrollVersion(e.target.value)}
-                    disabled={loading || enrollmentVersions.length === 0}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px' }}
-                  >
-                    <option value="">-- Select Enrollment Version --</option>
-                    {enrollmentVersions.map((version) => (
-                      <option key={version} value={version}>
-                        Version {version}
-                      </option>
-                    ))}
-                  </select>
-                  <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
-                    {enrollmentVersions.length > 0 && (
-                      <>
-                        Latest version: {Math.max(...enrollmentVersions)}
-                      </>
-                    )}
-                  </small>
-                </>
-              )}
+              </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="dosage-version-scenario">Dosage Version:</label>
-              {versionsLoading ? (
-                <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                  Loading versions...
-                </div>
-              ) : (
-                <>
-                  <select
-                    id="dosage-version-scenario"
-                    value={dosageVersion}
-                    onChange={(e) => setDosageVersion(e.target.value)}
-                    disabled={loading || dosingVersions.length === 0}
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '4px' }}
-                  >
-                    <option value="">-- Select Dosage Version --</option>
-                    {dosingVersions.map((version) => (
-                      <option key={version} value={version}>
-                        Version {version}
-                      </option>
-                    ))}
-                  </select>
-                  <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
-                    {dosingVersions.length > 0 && (
-                      <>
-                        Latest version: {Math.max(...dosingVersions)}
-                      </>
-                    )}
-                  </small>
-                </>
-              )}
-            </div>
-          </div>
+            <div className="form-row two">
+              <div className="form-group">
+                <label htmlFor="enroll-version-scenario">Enrollment Version:</label>
+                {versionsLoading ? (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    Loading versions...
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      id="enroll-version-scenario"
+                      value={enrollVersion}
+                      onChange={(e) => setEnrollVersion(e.target.value)}
+                      disabled={loading || enrollmentVersions.length === 0}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px' }}
+                    >
+                      <option value="">-- Select Enrollment Version --</option>
+                      {enrollmentVersions.map((version) => (
+                        <option key={version} value={version}>
+                          Version {version}
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
+                      {enrollmentVersions.length > 0 && (
+                        <>
+                          Latest version: {Math.max(...enrollmentVersions)}
+                        </>
+                      )}
+                    </small>
+                  </>
+                )}
+              </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-large btn-block"
-            disabled={loading || versionsLoading || affectedCountries.length === 0}
-          >
-            {loading ? '⏳ Calculating...' : '🎯 Apply Scenario'}
-          </button>
-        </form>
-      </div>
+              <div className="form-group">
+                <label htmlFor="dosage-version-scenario">Dosage Version:</label>
+                {versionsLoading ? (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    Loading versions...
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      id="dosage-version-scenario"
+                      value={dosageVersion}
+                      onChange={(e) => setDosageVersion(e.target.value)}
+                      disabled={loading || dosingVersions.length === 0}
+                      style={{ width: '100%', padding: '0.5rem', borderRadius: '4px' }}
+                    >
+                      <option value="">-- Select Dosage Version --</option>
+                      {dosingVersions.map((version) => (
+                        <option key={version} value={version}>
+                          Version {version}
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: 'var(--text-secondary)', marginTop: '0.25rem', display: 'block' }}>
+                      {dosingVersions.length > 0 && (
+                        <>
+                          Latest version: {Math.max(...dosingVersions)}
+                        </>
+                      )}
+                    </small>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary btn-large btn-block"
+              disabled={loading || versionsLoading || affectedCountries.length === 0}
+            >
+              {loading ? '⏳ Calculating...' : '🎯 Apply Scenario'}
+            </button>
+          </form>
+        </div>
+
+        {data && (
+          <div className="card-section">
+            <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Scenario Results</h3>
+
+            <div className="grid cols-2">
+              <div className="stat-box">
+                <div className="stat-label">Original Total Enrollments</div>
+                <div className="stat-value">{data.original_total?.toLocaleString()}</div>
+              </div>
+
+              <div className="stat-box">
+                <div className="stat-label">Scenario Total Enrollments</div>
+                <div className="stat-value">{data.scenario_total?.toLocaleString()}</div>
+              </div>
+
+              <div className="stat-box">
+                <div className="stat-label">Total Reduction</div>
+                <div className="stat-value" style={{ color: 'var(--danger)' }}>
+                  {data.total_reduction?.toLocaleString()}
+                </div>
+                <div className="stat-label">{data.reduction_percentage?.toFixed(1)}% reduction</div>
+              </div>
+
+              <div className="stat-box">
+                <div className="stat-label">Affected Countries</div>
+                <div className="stat-value">{affectedCountries.length}</div>
+                <div className="stat-label">{affectedCountries.join(', ')}</div>
+              </div>
+            </div>
+
+            {baselineData && (
+              <div style={{ marginTop: '2rem' }}>
+                <h4 style={{ marginBottom: '1rem' }}>Impact on Demand</h4>
+                <div className="grid cols-2">
+                  <div className="stat-box">
+                    <div className="stat-label">Baseline Total Demand</div>
+                    <div className="stat-value">{baselineData.total_demand.toLocaleString()}</div>
+                  </div>
+                  <div className="stat-box">
+                    <div className="stat-label">Estimated Scenario Demand</div>
+                    <div className="stat-value">
+                      {(baselineData.total_demand * (1 - data.reduction_percentage / 100)).toFixed(0)}
+                    </div>
+                    <div className="stat-label" style={{ color: 'var(--danger)' }}>
+                      (approx. {data.reduction_percentage.toFixed(1)}% reduction)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {baselineData && (
+              <button
+                className="btn btn-secondary btn-large btn-block"
+                onClick={onCompare}
+                style={{ marginTop: '1.5rem' }}
+                disabled={loading}
+              >
+                🔍 Compare with Baseline
+              </button>
+            )}
+          </div>
+        )}
+      </>
       )}
 
-      {data && (
+      {modelingTab === 'distribution' && (
         <div className="card-section">
-          <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Scenario Results</h3>
+          <EnrollmentDistribution />
+        </div>
+      )}
 
-          <div className="grid cols-2">
-            <div className="stat-box">
-              <div className="stat-label">Original Total Enrollments</div>
-              <div className="stat-value">{data.original_total?.toLocaleString()}</div>
-            </div>
-
-            <div className="stat-box">
-              <div className="stat-label">Scenario Total Enrollments</div>
-              <div className="stat-value">{data.scenario_total?.toLocaleString()}</div>
-            </div>
-
-            <div className="stat-box">
-              <div className="stat-label">Total Reduction</div>
-              <div className="stat-value" style={{ color: 'var(--danger)' }}>
-                {data.total_reduction?.toLocaleString()}
-              </div>
-              <div className="stat-label">{data.reduction_percentage?.toFixed(1)}% reduction</div>
-            </div>
-
-            <div className="stat-box">
-              <div className="stat-label">Affected Countries</div>
-              <div className="stat-value">{affectedCountries.length}</div>
-              <div className="stat-label">{affectedCountries.join(', ')}</div>
-            </div>
-          </div>
-          </div>
-        )}
-
-          {baselineData && (
-            <div style={{ marginTop: '2rem' }}>
-              <h4 style={{ marginBottom: '1rem' }}>Impact on Demand</h4>
-              <div className="grid cols-2">
-                <div className="stat-box">
-                  <div className="stat-label">Baseline Total Demand</div>
-                  <div className="stat-value">{baselineData.total_demand.toLocaleString()}</div>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-label">Estimated Scenario Demand</div>
-                  <div className="stat-value">
-                    {(baselineData.total_demand * (1 - data.reduction_percentage / 100)).toFixed(0)}
-                  </div>
-                  <div className="stat-label" style={{ color: 'var(--danger)' }}>
-                    (approx. {data.reduction_percentage.toFixed(1)}% reduction)
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {baselineData && (
-            <button
-              className="btn btn-secondary btn-large btn-block"
-              onClick={onCompare}
-              style={{ marginTop: '1.5rem' }}
-              disabled={loading}
-            >
-              🔍 Compare with Baseline
-            </button>
-          )}
-         {modelingTab === 'distribution' && (
-          <div className="card-section">
-            <EnrollmentDistribution />
-          </div>
-        )}
-
-      {/* Simulator Tab Content */}
       {modelingTab === 'simulator' && (
         <Simulator
           trialSeq={trialSeq}
           onSimulate={handleSimulatorSubmit}
           loading={loading}
         />
+      )}
+
+      {modelingTab === 'whatif' && (
+        <div className="card-section">
+          <ScenarioSimulation
+            trialSeq={trialSeq}
+            programSeq={programSeq}
+            baselineData={baselineData}
+            onSubmit={onSubmit}
+            loading={loading}
+          />
+        </div>
       )}
     </div>
   );

@@ -205,6 +205,7 @@ export const calculateBaselineDemand = async (
 /**
  * Apply a scenario modification to enrollments
  * @param {number} trialSeq - Trial sequence number
+ * @param {number} programSeq - Program sequence number
  * @param {string} scenarioName - Name of the scenario
  * @param {string[]} affectedCountries - Countries to adjust
  * @param {number} reductionFactor - Fraction to reduce (0.30 = 30%)
@@ -216,6 +217,7 @@ export const calculateBaselineDemand = async (
  */
 export const applyScenario = async (
   trialSeq,
+  programSeq,
   scenarioName,
   affectedCountries,
   reductionFactor,
@@ -227,6 +229,7 @@ export const applyScenario = async (
   try {
     const response = await apiClient.post('/scenario', {
       trial_seq: trialSeq,
+      program_seq: programSeq,
       scenario_name: scenarioName,
       affected_countries: affectedCountries,
       reduction_factor: reductionFactor,
